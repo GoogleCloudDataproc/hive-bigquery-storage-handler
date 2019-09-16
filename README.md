@@ -32,7 +32,6 @@ At this point you can operate Hive just like you used to do.
 If you have BigQuery table already, here is how you can define Hive table that refer to it:
 ```sql
 CREATE TABLE bq_test (word_count bigint, word string)
-STORED BY
   STORED BY
     'com.google.cloud.hadoop.io.bigquery.hive.HiveBigQueryStorageHandler'
   TBLPROPERTIES (
