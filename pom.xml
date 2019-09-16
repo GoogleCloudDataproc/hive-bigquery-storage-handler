@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (C) 2014 Google, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.google.cloud.hive.bigquery</groupId>
+    <artifactId>hive-bigquery-storage-handler</artifactId>
+    <version>1.0</version>
+
+    <name>hive-bigquery-storage-handler</name>
+
+    <properties>
+        <hadoop.version>2.9.2</hadoop.version>
+        <hive.version>2.3.4</hive.version>
+        <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
+        <bigdataoss-parent.version>2.0.0</bigdataoss-parent.version>
+        <junit.version>4.11</junit.version>
+        <guava.version>28.0-jre</guava.version>
+        <flogger.version>0.4</flogger.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven-compiler-plugin.version>3.6.2</maven-compiler-plugin.version>
+        <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
+        <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
+        <maven-exec-plugin.version>1.6.0</maven-exec-plugin.version>
+        <compiler.error.flag>-Werror</compiler.error.flag>
+        <compiler.default.pkginfo.flag>-Xpkginfo:always</compiler.default.pkginfo.flag>
+        <compiler.default.exclude>nothing</compiler.default.exclude>
+        <java.version>1.8</java.version>
+        <maven-shade-plugin.version>3.0.0</maven-shade-plugin.version>
+        <apache.avro.version>1.7.7</apache.avro.version>
+        <google.flogger.version>0.3.1</google.flogger.version>
+
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <version>${hadoop.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-mapreduce-client-common</artifactId>
+            <version>${hadoop.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-exec</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-common</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.cloud.bigdataoss</groupId>
+            <artifactId>bigquery-connector</artifactId>
+            <version>${bigquery-connector.version}</version>
+            <!-- evil hack to get around shading -->
+            <classifier>shaded</classifier>
+        </dependency>
+        <dependency>
+            <groupId>com.google.cloud.bigdataoss</groupId>
+            <artifactId>util</artifactId>
+            <version>${bigdataoss-parent.version}</version>
+        </dependency>
+
+        <!-- Force to include the right version of guava -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.google.cloud.bigdataoss:bigquery-connector:shaded</include>
+                                    <include>com.google.guava</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com</pattern>
+                                    <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.com</shadedPattern>
+                                    <includes>
+                                        <!--include>com.fasterxml.**</include-->
+                                        <include>com.google.**</include>
+                                    </includes>
+                                    <excludes>
+                                        <exclude>com.google.cloud.hive.bigquery.**</exclude>
+                                        <exclude>com.google.cloud.hadoop.io.bigquery.**</exclude>
+                                        <exclude>com.google.cloud.hadoop.repackaged.**</exclude>
+                                        <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
+                                        <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
+                                    </excludes>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"/>
+                            </transformers>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <compilerArgs>
+                        <arg>-Xlint:all</arg>
+                        <arg>${compiler.error.flag}</arg>
+                        <!-- Override options warnings to support cross-compilation -->
+                        <arg>-Xlint:-options</arg>
+                        <!-- Temporary lint overrides, to be removed over time. -->
+                        <arg>-Xlint:-cast</arg>
+                        <arg>-Xlint:-deprecation</arg>
+                        <arg>-Xlint:-processing</arg>
+                        <arg>-Xlint:-rawtypes</arg>
+                        <arg>-Xlint:-serial</arg>
+                        <arg>-Xlint:-try</arg>
+                        <arg>-Xlint:-unchecked</arg>
+                        <arg>-Xlint:-varargs</arg>
+                        <!-- Uncomment the following args to display more warnings. -->
+                        <!-- -Xmaxwarns -->
+                        <!-- 10000 -->
+                    </compilerArgs>
+                    <showWarnings>true</showWarnings>
+                    <!-- Another temp override, to be set to true in due course. -->
+                    <showDeprecation>false</showDeprecation>
+                </configuration>
+                <executions>
+
+                    <execution>
+                        <id>default-compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <phase>compile</phase>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>${compiler.default.pkginfo.flag}</arg>
+                            </compilerArgs>
+                            <excludes>
+                                <exclude>${compiler.default.exclude}</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${maven-exec-plugin.version}</version>
+                <configuration>
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                    <systemProperties>
+                        <systemProperty>
+                            <key>java.util.logging.config.file</key>
+                            <value>logging.properties</value>
+                        </systemProperty>
+                    </systemProperties>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
