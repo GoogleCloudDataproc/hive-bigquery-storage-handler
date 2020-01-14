@@ -23,19 +23,17 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Wrap our mapreduce RecordReader so it can be called
- * from Hadoop streaming and Hive.
+
+/*
+ * Class {@link BigQueryMapredAvroRecordReader} wraps  mapreduce RecordReader and can be
+ * used from Hadoop streaming and Hive
  */
 public class BigQueryMapredAvroRecordReader
     implements RecordReader<NullWritable, AvroGenericRecordWritable> {
 
-  private org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>
-      mapreduceRecordReader;
-  private long splitLength;
-  private static final Logger LOG = LoggerFactory.getLogger(
-      BigQueryMapredAvroRecordReader.class);
-  private Schema schema;
+  private static final Logger LOG = LoggerFactory.getLogger(BigQueryMapredAvroRecordReader.class);
+  private org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>   mapreduceRecordReader;
+  private final long splitLength;
 
   /**
    * This class is just a wrapper of DirectBigQueryRecordReader
@@ -43,16 +41,14 @@ public class BigQueryMapredAvroRecordReader
    * @param mapreduceRecordReader A mapreduce-based RecordReader.
    */
   public BigQueryMapredAvroRecordReader(
-      org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>
-          mapreduceRecordReader, long splitLength) {
+       org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord> mapreduceRecordReader
+      ,long splitLength) {
     this.mapreduceRecordReader = mapreduceRecordReader;
     this.splitLength = splitLength;
   }
 
-  public void close() throws IOException {
-    mapreduceRecordReader.close();
-  }
 
+  /*
   @Override
   public boolean next(NullWritable key, AvroGenericRecordWritable value) throws IOException {
     try {
@@ -60,19 +56,39 @@ public class BigQueryMapredAvroRecordReader
       if (!hasNext) {
         return false;
       }
-      NullWritable nextKey = mapreduceRecordReader.getCurrentKey();
+      key = mapreduceRecordReader.getCurrentKey();
       GenericRecord nextValue = mapreduceRecordReader.getCurrentValue();
-      this.schema = nextValue.getSchema();
-      key = createKey();
-      value.setRecord(GenericData.get().deepCopy(this.schema, nextValue));
-      value.setFileSchema(this.schema);
+      //this.schema = nextValue.getSchema();
+      //key = createKey();
+      value.setFileSchema(nextValue.getSchema());
+      value.setRecord(GenericData.get().deepCopy(nextValue.getSchema(), nextValue));
 
       return true;
     } catch (InterruptedException ex) {
       throw new IOException("Interrupted", ex);
     }
   }
+  */
 
+  @Override
+  public boolean next(NullWritable key, AvroGenericRecordWritable value) throws IOException {
+    try {
+      //splitLength check has been added to avoid stream finalize error when querying empty table.
+      if (this.splitLength > 0 && this.mapreduceRecordReader.nextKeyValue()) {
+        //key = this.mapreduceRecordReader.getCurrentKey();
+        GenericRecord nextValue = this.mapreduceRecordReader.getCurrentValue();
+        value.setFileSchema(nextValue.getSchema());
+        value.setRecord(nextValue);
+        return true;
+      }
+
+      return false;
+    } catch (InterruptedException ex) {
+      throw new IOException("Interrupted", ex);
+    }
+  }
+
+  @Override
   public NullWritable createKey() {
     return NullWritable.get();
   }
@@ -82,16 +98,23 @@ public class BigQueryMapredAvroRecordReader
     return new AvroGenericRecordWritable();
   }
 
+  @Override
   public long getPos() throws IOException {
     return splitLength * (long) getProgress();
   }
 
+  @Override
   public float getProgress() throws IOException {
     try {
       return mapreduceRecordReader.getProgress();
     } catch (InterruptedException ex) {
       throw new IOException("Interrupted", ex);
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    mapreduceRecordReader.close();
   }
 
 }

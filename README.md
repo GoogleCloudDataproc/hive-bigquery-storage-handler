@@ -46,12 +46,34 @@ You will need to provide the following table properties:
 
 | Property | Value |
 |--------|-----|
-| bq.dataset | BigQuery dataset id |
-| bq.table | BigQuery table name |
+| bq.dataset | BigQuery dataset id (Optional if hive database name matches BQ Dataset) |
+| bq.table | BigQuery table name (Optional if hive tablenmame matches BQ Table) |
 | mapred.bq.project.id | Your project id |
 | mapred.temp.gcs.path | Temporary file location in GCS bucket |
 | mapred.bq.gcs.bucket | Temporary GCS bucket name |
 
+### Data Type Mapping
+
+| BigQuery | Hive | DESCRIPTION | 
+|--------|-----| ---------------|
+| INTEGER | BIGINT | Signed 8-byte Integer
+| FLOAT | DOUBLE | 8-byte double precision floating point number
+| DATE | DATE | FORMAT IS YYYY-[M]M-[D]D. The range of values supported for the Date type is 0001-­01-­01 to 9999-­12-­31
+| TIMESTAMP | TIMESTAMP | Represents an absolute point in time since Unix epoch with millisecod precision (on Hive) compared to Microsecond precision on Bigquery.
+| BOOLEAN | BOOLEAN | Boolean values are represented by the keywords TRUE and FALSE
+| STRING | STRING | Variable-length character data
+| BYTES | BINARY | Variable-length binary data
+| REPEATED | ARRAY | Represents repeated values
+| RECORD | STRUCT | Represents nested structures
+
+### Caveats
+1. Ensure that bigquery column names are always lowercase
+2. timestamp column in hive is interpreted to be timezoneless and stored as an offset from the UNIX epoch with milliseconds precision.
+   To display in human readable format from_unix_time udf can be used as 
+   ```sql 
+   from_unixtime(cast(cast(<timestampcolumn> as bigint)/1000 as bigint), 'yyyy-MM-dd hh:mm:ss')    
+   ```
+   
 ### Issues
 1. Writing to BigQuery will fail when using Apache Tez as the execution engine. You can use ```set hive.execution.engine=mr```
 to ask Hive use MapReduce as the execution engine to workaround it.
