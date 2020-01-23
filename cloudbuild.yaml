@@ -4,96 +4,25 @@
 # The .m2 directory is cached across steps using a mounted volume and is saved to GCS  for future runs.
 
 # Manual Execution:
-# Use the below command from project root directory to invoke the build manually. Note the substitutions for
-# BRANCH_NAME and REPO_NAME. These variables are normally populated when the build is executed via build
-# triggers but will be empty during manual execution. Dummy branch and REPO_NAME can be passed during manual
-# execution so the artifacts can be uploaded upon build completion.
+# Use the below command from project root directory to invoke the build manually.
+# gcloud builds submit . --config=cloudbuild.yaml
 #
-# gcloud builds submit . --config=cloudbuild.yaml \
-#  --substitutions=_BUCKET="${USER}-artificatory",_MAIN_REPO="True",BRANCH_NAME="master",REPO_NAME="hive-bigquery-storage-handler"
-#
-
 
 steps:
 ###########################################################
-# Step 1: Create the empty cached .m2 directory if not exists
+# Step 1: Create a Docker image with maven installed
 ###########################################################
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
+- name: 'gcr.io/cloud-builders/docker'
   args:
-  - '-c'
-  - |
-    gsutil mb gs://${_BUCKET} > /dev/null 2>&1
-    cachesize=$(gsutil du -s gs://${_BUCKET}/cache/.m2 | awk '{ print $1 }') #Check the size of the cache
-    if [[ $cachesize -eq 0 ]]; then
-      echo "Copying empty file to create maven cache path"
-      touch emptyfile.txt
-      gsutil cp emptyfile.txt gs://${_BUCKET}/cache/.m2/
-    fi
+    - 'build'
+    - '--build-arg=MAVEN_VERSION=3.5.0-jdk-8'
+    - '--tag=gcr.io/$PROJECT_ID/dataproc-hive-bigquery-storagehandler'
+    - '.'
 
 ###########################################################
-# Step 2: Retrieve the cached .m2 directory from GCS
+# Step 2: Run unit tests
 ###########################################################
-- name: 'gcr.io/cloud-builders/gsutil'
+- name: 'gcr.io/$PROJECT_ID/dataproc-hive-bigquery-storagehandler'
+  entrypoint: 'mvn'
   args:
-  - '-m'
-  - 'rsync'
-  - '-r'
-  - 'gs://${_BUCKET}/cache/.m2'
-  - '/cache/.m2'
-  volumes:
-  - path: '/cache/.m2'
-    name: 'maven_cache'
-
-###########################################################
-# Step 3: Build, Test, and Verify
-###########################################################
-- name: 'gcr.io/cloud-builders/mvn'
-  args:
-  - '--batch-mode'
-  - 'verify'
-  volumes:
-  - path: '/cache/.m2'
-    name: 'maven_cache'
-  env:
-  - MAVEN_OPTS=-Dmaven.repo.local=/cache/.m2
-
-###########################################################
-# Step 4: Update cached .m2 directory on GCS with additional
-#         dependencies downloaded during the current build
-###########################################################
-- name: 'gcr.io/cloud-builders/gsutil'
-  args:
-  - '-m'
-  - 'rsync'
-  - '-r'
-  - '/cache/.m2'
-  - 'gs://${_BUCKET}/cache/.m2'
-  volumes:
-  - path: '/cache/.m2'
-    name: 'maven_cache'
-
-
-###########################################################
-# Step 5: Copy the Jar to public artifactory in case of
-#         push request to master branch of main repository
-###########################################################
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    if [ "${_MAIN_REPO}" == "True" -a "$BRANCH_NAME" == "master" ]; then
-      echo "Copying jar files to artifactory"
-      gsutil -m cp target/*.jar gs://${_BUCKET}/artifacts/${REPO_NAME}/
-    fi
-
-
-substitutions:
-  # Default values
-  _BUCKET: 'cloud-pso-artifactory'
-  _MAIN_REPO: 'False'
-
-options:
-  # Use higher CPU machines so the caching and build steps are faster.
-  machineType: 'N1_HIGHCPU_32'
+    - 'test'

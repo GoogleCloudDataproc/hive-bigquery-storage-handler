@@ -47,29 +47,6 @@ public class BigQueryMapredAvroRecordReader
     this.splitLength = splitLength;
   }
 
-
-  /*
-  @Override
-  public boolean next(NullWritable key, AvroGenericRecordWritable value) throws IOException {
-    try {
-      boolean hasNext = mapreduceRecordReader.nextKeyValue();
-      if (!hasNext) {
-        return false;
-      }
-      key = mapreduceRecordReader.getCurrentKey();
-      GenericRecord nextValue = mapreduceRecordReader.getCurrentValue();
-      //this.schema = nextValue.getSchema();
-      //key = createKey();
-      value.setFileSchema(nextValue.getSchema());
-      value.setRecord(GenericData.get().deepCopy(nextValue.getSchema(), nextValue));
-
-      return true;
-    } catch (InterruptedException ex) {
-      throw new IOException("Interrupted", ex);
-    }
-  }
-  */
-
   @Override
   public boolean next(NullWritable key, AvroGenericRecordWritable value) throws IOException {
     try {

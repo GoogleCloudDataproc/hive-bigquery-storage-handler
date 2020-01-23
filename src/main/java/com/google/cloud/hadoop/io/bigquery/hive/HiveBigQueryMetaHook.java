@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.io.bigquery.hive;
 
-import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -8,15 +7,13 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 /**
  *  Class {@link HiveBigQueryMetaHook} can be used to validate and perform different actions during creation and
  *  dropping of Hive Table.
  */
 public class HiveBigQueryMetaHook implements HiveMetaHook {
 
-    private static Logger LOGGER = LoggerFactory.getLogger(HiveBigQueryMetaHook.class);
+    private static Logger LOG = LoggerFactory.getLogger(HiveBigQueryMetaHook.class);
 
     /**
      *  Performs required validations prior to creating the table
@@ -34,19 +31,6 @@ public class HiveBigQueryMetaHook implements HiveMetaHook {
                 throw new MetaException(property + " table property cannot be empty.");
             }
         }
-
-        //Check working path is GCS path
-        /*
-        Path workingPath = new Path(table.getParameters().get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
-         try {
-             FileSystem fs = workingPath.getFileSystem(new Configuration());
-             if (! "gs".equals(fs.getScheme())) {
-                 throw new MetaException(BigQueryConfiguration.TEMP_GCS_PATH_KEY + " must be in the format gs://<bucketname>/{prefix}");
-             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        */
 
         //Check compatibility with BigQuery features
         //TODO: accept DATE column 1 level partitioning
