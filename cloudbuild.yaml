@@ -1,0 +1,28 @@
+# Google Cloud Build script for Hive-BigQuery-StorageHandler
+#
+# This build script is used to build the repository for every change pushed.
+# The .m2 directory is cached across steps using a mounted volume and is saved to GCS  for future runs.
+
+# Manual Execution:
+# Use the below command from project root directory to invoke the build manually.
+# gcloud builds submit . --config=cloudbuild.yaml
+#
+
+steps:
+###########################################################
+# Step 1: Create a Docker image with maven installed
+###########################################################
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '--build-arg=MAVEN_VERSION=3.5.0-jdk-8'
+    - '--tag=gcr.io/$PROJECT_ID/dataproc-hive-bigquery-storagehandler'
+    - '.'
+
+###########################################################
+# Step 2: Run unit tests
+###########################################################
+- name: 'gcr.io/$PROJECT_ID/dataproc-hive-bigquery-storagehandler'
+  entrypoint: 'mvn'
+  args:
+    - 'test'
