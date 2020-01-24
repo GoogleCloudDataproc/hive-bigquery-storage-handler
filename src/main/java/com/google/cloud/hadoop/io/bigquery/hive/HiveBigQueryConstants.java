@@ -16,20 +16,15 @@ package com.google.cloud.hadoop.io.bigquery.hive;
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
 import com.google.common.collect.ImmutableList;
 
-/**
- *  Contains all Constants
- */
-
+/** Contains all Constants */
 public class HiveBigQueryConstants {
-    public static final String UNIQUE_JOB_KEY = "mapred.bq.unique.job.id";
-    public static final String DEFAULT_BIGQUERY_DATASET_KEY = "bq.dataset";
-    public static final String DEFAULT_BIGQUERY_TABLE_KEY = "bq.table";
+  public static final String UNIQUE_JOB_KEY = "mapred.bq.unique.job.id";
+  public static final String DEFAULT_BIGQUERY_DATASET_KEY = "bq.dataset";
+  public static final String DEFAULT_BIGQUERY_TABLE_KEY = "bq.table";
 
-    public static final ImmutableList<String> MANDATORY_TABLE_PROPERTIES =
-            ImmutableList.of(
-                   // HiveBigQueryConstants.DEFAULT_BIGQUERY_DATASET_KEY,
-                   // HiveBigQueryConstants.DEFAULT_BIGQUERY_TABLE_KEY,
-                    BigQueryConfiguration.PROJECT_ID_KEY,
-                    BigQueryConfiguration.GCS_BUCKET_KEY,
-                    BigQueryConfiguration.TEMP_GCS_PATH_KEY);
+  public static final ImmutableList<String> MANDATORY_TABLE_PROPERTIES =
+      ImmutableList.of(
+          BigQueryConfiguration.PROJECT_ID_KEY,
+          BigQueryConfiguration.GCS_BUCKET_KEY,
+          BigQueryConfiguration.TEMP_GCS_PATH_KEY);
 }

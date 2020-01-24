@@ -142,7 +142,7 @@ public class WrappedBigQueryAvroInputFormat extends FileInputFormat<NullWritable
         /**
          * @param mapreduceInputSplit An InputSplit that also
          *        implements Writable.
-         * @param path A HDFS path of that split. Hive assumes tables are file-based.
+         * @param path A HCFS path of that split. Hive assumes tables are file-based.
          */
         public BigQueryMapredInputSplit(
             org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit, Path path) {
@@ -167,7 +167,7 @@ public class WrappedBigQueryAvroInputFormat extends FileInputFormat<NullWritable
 
         @Override
         public long getLength() {
-            return  1L;
+            return 1L;
         }
 
         @Override

@@ -49,9 +49,9 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
     try {
       BigQueryOutputConfiguration.configureWithAutoSchema(
           conf,
-          conf.get(
-              BigQueryConfiguration.OUTPUT_DATASET_ID_KEY) + "." +
-              conf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY),
+          conf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY)
+              + "."
+              + conf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY),
           outputFileUri,
           BigQueryFileFormat.AVRO,
           // Unused
@@ -71,19 +71,19 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
       String outputFileUri = WrappedBigQueryAvroOutputFormat.getTempFilename(conf);
       List<String> loadFiles = getLoadFiles(outputFileUri, conf);
       String projectId = BigQueryOutputConfiguration.getProjectId(conf);
-      if(loadFiles.size() > 0) {
+      if (loadFiles.size() > 0) {
         LOG.info("Ready to load temporary files under:" + outputFileUri);
         bigquery.importFromGcs(
-                projectId,
-                getTableReference(conf),
-                null,
-                null,
-                null,
-                BigQueryFileFormat.AVRO,
-                BigQueryConfiguration.OUTPUT_TABLE_CREATE_DISPOSITION_DEFAULT,
-                BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION_DEFAULT,
-                loadFiles,
-                true);
+            projectId,
+            getTableReference(conf),
+            null,
+            null,
+            null,
+            BigQueryFileFormat.AVRO,
+            BigQueryConfiguration.OUTPUT_TABLE_CREATE_DISPOSITION_DEFAULT,
+            BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION_DEFAULT,
+            loadFiles,
+            true);
       } else {
         LOG.error("Found no valid files under: " + outputFileUri);
       }
@@ -102,7 +102,7 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
 
   @Override
   public void setupTask(TaskAttemptContext taskAttemptContext) throws IOException {
-    //Do nothing by default
+    // Do nothing by default
   }
 
   @Override
@@ -112,7 +112,7 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
 
   @Override
   public void commitTask(TaskAttemptContext taskAttemptContext) throws IOException {
-    //Do nothing by default
+    // Do nothing by default
   }
 
   @Override
@@ -125,10 +125,10 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
   // TODO: make public in BigQueryOutputConfiguration
   static TableReference getTableReference(Configuration conf) throws IOException {
     String projectId = BigQueryOutputConfiguration.getProjectId(conf);
-    String datasetId = ConfigurationUtil.getMandatoryConfig(
-        conf, BigQueryConfiguration.OUTPUT_DATASET_ID_KEY);
-    String tableId = ConfigurationUtil.getMandatoryConfig(
-        conf, BigQueryConfiguration.OUTPUT_TABLE_ID_KEY);
+    String datasetId =
+        ConfigurationUtil.getMandatoryConfig(conf, BigQueryConfiguration.OUTPUT_DATASET_ID_KEY);
+    String tableId =
+        ConfigurationUtil.getMandatoryConfig(conf, BigQueryConfiguration.OUTPUT_TABLE_ID_KEY);
 
     return (new TableReference())
         .setProjectId(projectId)
@@ -136,13 +136,12 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
         .setTableId(tableId);
   }
 
-  private static void removeJobOutput(JobConf jobConf) throws IOException{
+  private static void removeJobOutput(JobConf jobConf) throws IOException {
     String outputFileUri = WrappedBigQueryAvroOutputFormat.getTempFilename(jobConf);
     Path outputFilePath = new Path(outputFileUri);
     FileSystem fs = outputFilePath.getFileSystem(jobConf);
     LOG.info("Removing job output from path: " + outputFileUri);
-    if(fs.exists(outputFilePath))
-      fs.deleteOnExit(outputFilePath);
+    if (fs.exists(outputFilePath)) fs.deleteOnExit(outputFilePath);
   }
 
   /*
@@ -150,18 +149,16 @@ public class HiveBigQueryOutputCommitter extends OutputCommitter {
    * We skip _temporary and _SUCCESS files and directories
    */
   private static List<String> getLoadFiles(String outputFileUri, JobConf jobConf)
-      throws IOException{
+      throws IOException {
     Path path = new Path(outputFileUri);
     FileSystem fs = path.getFileSystem(jobConf);
     ArrayList<String> loadFiles = new ArrayList<>();
 
     FileStatus[] fileStatuses = fs.listStatus(path);
-    for(FileStatus fileStatus : fileStatuses) {
-      if(fileStatus.getLen() <1)
-        continue;
-      if(fileStatus.getPath().getName().endsWith(FileOutputCommitter.TEMP_DIR_NAME))
-        continue;
-      if(fileStatus.getPath().getName().endsWith(FileOutputCommitter.SUCCEEDED_FILE_NAME))
+    for (FileStatus fileStatus : fileStatuses) {
+      if (fileStatus.getLen() < 1) continue;
+      if (fileStatus.getPath().getName().endsWith(FileOutputCommitter.TEMP_DIR_NAME)) continue;
+      if (fileStatus.getPath().getName().endsWith(FileOutputCommitter.SUCCEEDED_FILE_NAME))
         continue;
 
       loadFiles.add(fileStatus.getPath().toString());

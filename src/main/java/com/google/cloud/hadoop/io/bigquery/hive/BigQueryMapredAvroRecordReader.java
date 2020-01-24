@@ -23,7 +23,6 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /*
  * Class {@link BigQueryMapredAvroRecordReader} wraps  mapreduce RecordReader and can be
  * used from Hadoop streaming and Hive
@@ -32,17 +31,18 @@ public class BigQueryMapredAvroRecordReader
     implements RecordReader<NullWritable, AvroGenericRecordWritable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(BigQueryMapredAvroRecordReader.class);
-  private org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>   mapreduceRecordReader;
+  private org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>
+      mapreduceRecordReader;
   private final long splitLength;
 
   /**
-   * This class is just a wrapper of DirectBigQueryRecordReader
-   *   for Hive to use the mapred API.
+   * This class is just a wrapper of DirectBigQueryRecordReader for Hive to use the mapred API.
+   *
    * @param mapreduceRecordReader A mapreduce-based RecordReader.
    */
   public BigQueryMapredAvroRecordReader(
-       org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord> mapreduceRecordReader
-      ,long splitLength) {
+      org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord> mapreduceRecordReader,
+      long splitLength) {
     this.mapreduceRecordReader = mapreduceRecordReader;
     this.splitLength = splitLength;
   }
@@ -50,9 +50,9 @@ public class BigQueryMapredAvroRecordReader
   @Override
   public boolean next(NullWritable key, AvroGenericRecordWritable value) throws IOException {
     try {
-      //splitLength check has been added to avoid stream finalize error when querying empty table.
+      // splitLength check has been added to avoid stream finalize error when querying empty table.
       if (this.splitLength > 0 && this.mapreduceRecordReader.nextKeyValue()) {
-        //key = this.mapreduceRecordReader.getCurrentKey();
+        // key = this.mapreduceRecordReader.getCurrentKey();
         GenericRecord nextValue = this.mapreduceRecordReader.getCurrentValue();
         value.setFileSchema(nextValue.getSchema());
         value.setRecord(nextValue);
@@ -93,5 +93,4 @@ public class BigQueryMapredAvroRecordReader
   public void close() throws IOException {
     mapreduceRecordReader.close();
   }
-
 }
