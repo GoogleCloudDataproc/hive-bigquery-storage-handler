@@ -41,11 +41,6 @@ public class HiveBigQueryMetaHook implements HiveMetaHook {
       throw new MetaException("Creation of bucketed table is not supported");
     }
 
-    if (table.getTableType().equals("EXTERNAL_TABLE")) {
-      throw new MetaException("Creation of External table is not supported.");
-    }
-
-
     if(!Strings.isNullOrEmpty(table.getSd().getLocation())) {
        throw new MetaException("Cannot create table in BigQuery with Location property.");
     }

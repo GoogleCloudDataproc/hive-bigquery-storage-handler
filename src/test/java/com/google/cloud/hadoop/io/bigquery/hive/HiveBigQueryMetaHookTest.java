@@ -68,8 +68,9 @@ public class HiveBigQueryMetaHookTest {
     }
 
     @Test(expected = MetaException.class)
-    public void testExternalTableThrowsException() throws  MetaException {
-        this.hiveTable.setTableType("EXTERNAL_TABLE");
+    public void testLocationThrowsException() throws  MetaException {
+        StorageDescriptor storageDescriptor = this.hiveTable.getSd();
+        storageDescriptor.setLocation("gs://bucketname/temp/");
         hiveBigQueryMetaHook.preCreateTable(this.hiveTable);
     }
 
