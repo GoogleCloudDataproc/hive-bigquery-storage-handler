@@ -44,14 +44,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /*
- * Wrapper to allow DirectBigQueryInputFormat to be used in mapred API.
+ * Class {@link WrappedBigQueryAvroInputFormat} allows DirectBigQueryInputFormat to be used in mapred API.
  */
-public class WrappedBigQueryAvroInputFormat extends
-    FileInputFormat<NullWritable, AvroGenericRecordWritable> {
+public class WrappedBigQueryAvroInputFormat extends FileInputFormat<NullWritable, AvroGenericRecordWritable> {
     private static final Logger LOG = LoggerFactory.getLogger(WrappedBigQueryAvroInputFormat.class);
-    private org.apache.hadoop.mapreduce.InputFormat<NullWritable, GenericRecord>
-            mapreduceInputFormat = new DirectBigQueryInputFormat();
+    private org.apache.hadoop.mapreduce.InputFormat<NullWritable, GenericRecord> mapreduceInputFormat =
+            new DirectBigQueryInputFormat();
 
+    /**
+     * Creates hadoop splits (i.e BigQuery streams) so that each mapper can read data from the corresponding stream
+     * @param job  Represents hadoop job
+     * @param numSplits Number of splits
+     * @return InputSplit[] - Collection of FileSplits representing BigQueryMapredInputSplit
+     * @throws IOException
+     */
     @Override
     public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
         // We don't really use any information in the job Context
@@ -61,6 +67,7 @@ public class WrappedBigQueryAvroInputFormat extends
         } catch (InterruptedException ex) {
             throw new IOException("Interrupted", ex);
         }
+
         if (mapreduceSplits == null) {
             return null;
         }
@@ -77,6 +84,15 @@ public class WrappedBigQueryAvroInputFormat extends
         return splits;
     }
 
+    /**
+     *  Creates RecordReader<K,V> where key is null and Value is AvroGenericRecord representing BQ Row
+     *
+     * @param inputSplit InputSplit (i.e BQ Stream object) containg slice of records
+     * @param conf  Job Configuration
+     * @param reporter reporter instance
+     * @return instance of BigQueryMapredAvroRecordReader
+     * @throws IOException
+     */
     @Override
     public RecordReader<NullWritable, AvroGenericRecordWritable> getRecordReader(
         InputSplit inputSplit, JobConf conf, Reporter reporter) throws IOException {
@@ -93,11 +109,14 @@ public class WrappedBigQueryAvroInputFormat extends
                     ((BigQueryMapredInputSplit) inputSplit).getMapreduceInputSplit();
             LOG.info("mapreduceInputSplit is {}, class is {}",
                     mapreduceInputSplit, mapreduceInputSplit.getClass().getName());
-            org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>
-                mapreduceRecordReader = mapreduceInputFormat.createRecordReader(
-                    mapreduceInputSplit, context);
+            org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>  mapreduceRecordReader =
+                   mapreduceInputFormat.createRecordReader(mapreduceInputSplit, context);
             mapreduceRecordReader.initialize(mapreduceInputSplit, context);
             long splitLength = inputSplit.getLength();
+
+            if(mapreduceInputSplit instanceof DirectBigQueryInputSplit ){
+                splitLength = ((DirectBigQueryInputSplit)mapreduceInputSplit).getLimit();
+            }
 
             return new BigQueryMapredAvroRecordReader(mapreduceRecordReader, splitLength);
         } catch (InterruptedException ex) {
@@ -105,7 +124,10 @@ public class WrappedBigQueryAvroInputFormat extends
         }
     }
 
-
+    /**
+     * Mapreduce input split representing a Big Query Stream to be processed by each mapper.
+     * mapreduceInputSplit holds an instance of com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat$DirectBigQueryInputSplit
+     */
     static class BigQueryMapredInputSplit extends HiveInputSplit {
         private org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit;
         private Writable writableInputSplit;
@@ -122,7 +144,7 @@ public class WrappedBigQueryAvroInputFormat extends
          *        implements Writable.
          * @param path A HCFS path of that split. Hive assumes tables are file-based.
          */
-        BigQueryMapredInputSplit(
+        public BigQueryMapredInputSplit(
             org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit, Path path) {
             super();
             this.mapreduceInputSplit = mapreduceInputSplit;

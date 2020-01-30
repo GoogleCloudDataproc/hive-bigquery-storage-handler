@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat;
@@ -27,40 +28,74 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /*
- * Wrapper class for BigQuery writes.
+ * Class {@link WrappedBigQueryAvroOutputFormat} serializes Hive records as Avro records and writes to file on GCS
  */
+
 public class WrappedBigQueryAvroOutputFormat extends AvroContainerOutputFormat {
-    private static final Logger LOG = LoggerFactory
-        .getLogger(WrappedBigQueryAvroOutputFormat.class);
-    public static final String TEMP_NAME = "_hadoop_temporary_";
+  private static final Logger LOG = LoggerFactory.getLogger(WrappedBigQueryAvroOutputFormat.class);
 
-    @Override
-    public RecordWriter getHiveRecordWriter(JobConf jobConf, Path path,
-        Class<? extends Writable> valueClass, boolean isCompressed,
-        Properties properties, Progressable progressable) throws IOException {
+  /**
+   * Create Hive Record writer.
+   *
+   * @param jobConf Hadoop Job Configuration
+   * @param path Hadoop File Path
+   * @param valueClass Class representing record (in this case AvroGenericRecordWritable)
+   * @param isCompressed Indicates whether records are compressed or not
+   * @param properties Job Properties
+   * @param progressable Instance to represent the task progress
+   * @return Instance of Hive Record Writer
+   * @throws IOException
+   */
+  @Override
+  public RecordWriter getHiveRecordWriter(
+      JobConf jobConf,
+      Path path,
+      Class<? extends Writable> valueClass,
+      boolean isCompressed,
+      Properties properties,
+      Progressable progressable)
+      throws IOException {
 
-        Path actual = new Path(getTempFilename(jobConf));
-        LOG.warn("Set temporary output file to {}", actual.getName());
+    Path actual = new Path(getTempFilename(jobConf));
+    LOG.info("Set temporary output file to {}", actual.getName());
 
-        return super.getHiveRecordWriter(
-                    jobConf, actual, valueClass, isCompressed, properties, progressable);
-    }
+    return super.getHiveRecordWriter(
+        jobConf, actual, valueClass, isCompressed, properties, progressable);
+  }
 
-    /*
-     * Generate a temporary file name that stores the temporary Avro output from the
-     * AvroContainerOutputFormat. The file will be loaded into BigQuery later.
-     */
-    public static String getTempFilename(JobConf jobConf) {
-        String outputTableId =
-            jobConf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY);
-        String tempOutputPath = jobConf.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY);
-        String tempDataset = jobConf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY) + TEMP_NAME;
-        String uniqueID = jobConf.get(HiveBigQueryConstants.UNIQUE_JOB_KEY);
+  /**
+   * Checks output Spec and sets HiveBigQueryOutputCommitter
+   *
+   * @param ignored Hadoop File System
+   * @param jobConf Job Configuration
+   * @throws IOException
+   */
+  @Override
+  public void checkOutputSpecs(FileSystem ignored, JobConf jobConf) throws IOException {
+    // can perform various checks
+    LOG.info("Setting HiveBigQueryOutputCommitter..");
+    jobConf.setOutputCommitter(HiveBigQueryOutputCommitter.class);
+  }
 
-        String tempTable = String.format("%s_%s_%s",
-            tempDataset, outputTableId.replace("$","__"), uniqueID);
+  /**
+   * Generate a temporary file name that stores the temporary Avro output from the
+   * AvroContainerOutputFormat. The file will be loaded into BigQuery later.
+   *
+   * @param jobConf Hadoop Job Configuration
+   * @return Fully Qualified temporary table path on GCS
+   */
+  public static String getTempFilename(JobConf jobConf) {
 
-        return tempOutputPath + tempTable;
-    }
+    String tempOutputPath = jobConf.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY);
+    String tempDataset = jobConf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY);
+    String outputTableId = jobConf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY);
+    String uniqueID = jobConf.get(HiveBigQueryConstants.UNIQUE_JOB_KEY);
 
+    Path tempFilePath =
+        new Path(
+            tempOutputPath,
+            String.format("%s_%s_%s", tempDataset, outputTableId.replace("$", "__"), uniqueID));
+
+    return tempFilePath.toString();
+  }
 }

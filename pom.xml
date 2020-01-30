@@ -31,6 +31,7 @@
         <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
         <bigdataoss-parent.version>2.0.0</bigdataoss-parent.version>
         <junit.version>4.11</junit.version>
+        <hamcrest.version>2.2</hamcrest.version>
         <guava.version>28.0-jre</guava.version>
         <flogger.version>0.4</flogger.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -98,10 +99,18 @@
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
         </dependency>
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <version>${hamcrest.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

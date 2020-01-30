@@ -1,3 +1,2 @@
 ARG MAVEN_VERSION=latest
 FROM maven:${MAVEN_VERSION}
-
