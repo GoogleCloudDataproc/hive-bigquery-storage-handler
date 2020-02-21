@@ -2,10 +2,14 @@ package com.google.cloud.hadoop.io.bigquery.hive;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Class {@link HiveBigQueryMetaHook} can be used to validate and perform different actions during
@@ -19,7 +23,7 @@ public class HiveBigQueryMetaHook implements HiveMetaHook {
    * Performs required validations prior to creating the table
    *
    * @param table Represents hive table object
-   * @throws MetaException
+   * @throws MetaException if table metadata violates the constraints
    */
   @Override
   public void preCreateTable(Table table) throws MetaException {
@@ -59,6 +63,17 @@ public class HiveBigQueryMetaHook implements HiveMetaHook {
       table
           .getParameters()
           .put(HiveBigQueryConstants.DEFAULT_BIGQUERY_TABLE_KEY, table.getTableName());
+    }
+
+    List<FieldSchema> columnList = table.getSd().getCols();
+    if(columnList != null && columnList.size() > 0) {
+      //Set primitive Column names as PREDICATE_PUSHDOWN_COLUMNS
+     String columnNames = columnList.stream()
+                                    .filter(column -> HiveBigQueryConstants.PPD_ALLOWED_TYPES.contains(column.getType()))
+                                    .map(column -> column.getName())
+                                    .collect(Collectors.joining(HiveBigQueryConstants.DELIMITER));
+
+      table.getParameters().put(HiveBigQueryConstants.PREDICATE_PUSHDOWN_COLUMNS,columnNames);
     }
   }
 

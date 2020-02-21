@@ -7,9 +7,8 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.junit.*;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 
@@ -45,7 +44,11 @@ public class HiveBigQueryMetaHookTest {
         this.hiveTable.setParameters(this.tableParameters);
 
         this.hiveTable.setSd(new StorageDescriptor());
-
+        List<FieldSchema> columns = new ArrayList<>();
+        columns.add(new FieldSchema("id", "bigint", "Id column"));
+        columns.add(new FieldSchema("name", "string", "Id column"));
+        columns.add(new FieldSchema("skills", "array<string>",""));
+        this.hiveTable.getSd().setCols(columns);
     }
 
     @Test(expected = MetaException.class)
@@ -88,6 +91,12 @@ public class HiveBigQueryMetaHookTest {
         hiveBigQueryMetaHook.preCreateTable(this.hiveTable);
         assertEquals(this.hiveTable.getDbName(), this.hiveTable.getParameters().get(HiveBigQueryConstants.DEFAULT_BIGQUERY_DATASET_KEY));
         assertEquals(this.hiveTable.getTableName(), this.hiveTable.getParameters().get(HiveBigQueryConstants.DEFAULT_BIGQUERY_TABLE_KEY));
+    }
+
+    @Test
+    public void testAssigningPredicatePushdownColumns() throws  MetaException {
+        hiveBigQueryMetaHook.preCreateTable(this.hiveTable);
+        assertEquals(this.hiveTable.getParameters().get(HiveBigQueryConstants.PREDICATE_PUSHDOWN_COLUMNS), "id,name");
     }
 
 }

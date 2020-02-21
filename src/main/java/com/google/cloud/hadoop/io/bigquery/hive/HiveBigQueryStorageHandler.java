@@ -20,11 +20,16 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
+import org.apache.hadoop.hive.ql.index.IndexPredicateAnalyzer;
+import org.apache.hadoop.hive.ql.index.IndexSearchCondition;
 import org.apache.hadoop.hive.ql.metadata.DefaultStorageHandler;
+import org.apache.hadoop.hive.ql.metadata.HiveStoragePredicateHandler;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
-import org.apache.hadoop.hive.ql.security.authorization.DefaultHiveAuthorizationProvider;
-import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
+import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.avro.AvroSerDe;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
@@ -32,11 +37,15 @@ import org.apache.hadoop.mapred.OutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 
-public class HiveBigQueryStorageHandler extends DefaultStorageHandler {
+/**
+ * Class {@link HiveBigQueryStorageHandler} contains the functionality to read & write data from &
+ * to BigQuery tables from hive. Provides additional capabilities such as metadata validation and
+ * projection/Predicate pushdown
+ */
+public class HiveBigQueryStorageHandler extends DefaultStorageHandler
+    implements HiveStoragePredicateHandler {
   private static final Logger LOG = LoggerFactory.getLogger(HiveBigQueryStorageHandler.class);
 
   @Override
@@ -138,7 +147,8 @@ public class HiveBigQueryStorageHandler extends DefaultStorageHandler {
   private void setJobConfProperties(Map<String, String> jobProperties) {
 
     Configuration jobConf = this.getConf();
-    jobProperties.keySet().stream()
+    jobProperties
+        .keySet()
         .forEach((String property) -> jobConf.set(property, jobProperties.get(property)));
   }
 
@@ -165,5 +175,71 @@ public class HiveBigQueryStorageHandler extends DefaultStorageHandler {
     String jobID = UUID.randomUUID().toString().replace("-", "_");
     jobID = jobID.substring(jobID.length() - 12);
     jobConf.set(HiveBigQueryConstants.UNIQUE_JOB_KEY, jobID);
+  }
+
+  @Override
+  public DecomposedPredicate decomposePredicate(
+      JobConf jobConf, Deserializer deserializer, ExprNodeDesc predicate) {
+    IndexPredicateAnalyzer analyzer = new IndexPredicateAnalyzer();
+    // adding Comparison Operators
+    for (String comparisionOperator :
+        new String[] {
+          "GenericUDFOPEqual",
+          "GenericUDFOPGreaterThan",
+          "GenericUDFOPLessThan",
+          "GenericUDFOPEqualOrGreaterThan",
+          "GenericUDFOPEqualOrLessThan",
+          "GenericUDFIn",
+          "GenericUDFBetween",
+          "GenericUDFOPNot",
+          "GenericUDFOPNull",
+          "GenericUDFOPNotNull",
+          "GenericUDFOPNotEqual",
+          "GenericUDFOPAnd",
+          "GenericUDFOPOr"
+        }) {
+
+      analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic." + comparisionOperator);
+    }
+
+    // Adding Columns that are eligible for predicate push down
+    String columnNames = jobConf.get(HiveBigQueryConstants.PREDICATE_PUSHDOWN_COLUMNS, "");
+    if (columnNames.length() > 0) {
+      LOG.info("{} - {}", HiveBigQueryConstants.PREDICATE_PUSHDOWN_COLUMNS, columnNames);
+
+      Arrays.stream(columnNames.split(HiveBigQueryConstants.DELIMITER))
+          .forEach(columnName -> analyzer.allowColumnName(columnName));
+    }
+
+    List<IndexSearchCondition> searchConditions = new ArrayList<>();
+
+    // filtering out residual and pushed predicate
+    ExprNodeGenericFuncDesc residualPredicate =
+        (ExprNodeGenericFuncDesc) analyzer.analyzePredicate(predicate, searchConditions);
+
+    // Convert the values of timestamp and date data types to String format since these type values
+    // are represented in numeric
+    ImmutableList<String> typesToConvertToString = ImmutableList.of("date", "timestamp");
+    searchConditions.stream()
+        .filter(
+            searchCondition ->
+                typesToConvertToString.contains(
+                    searchCondition.getColumnDesc().getTypeInfo().getTypeName().toLowerCase()))
+        .forEach(
+            searchCondition ->
+                searchCondition
+                    .getConstantDesc()
+                    .setValue(
+                        String.format("'%s'", searchCondition.getConstantDesc().getExprString())));
+
+    DecomposedPredicate decomposedPredicate = new DecomposedPredicate();
+    decomposedPredicate.pushedPredicate = analyzer.translateSearchConditions(searchConditions);
+    decomposedPredicate.residualPredicate = residualPredicate;
+    if (decomposedPredicate.pushedPredicate != null)
+      LOG.info("Predicates pushed: " + decomposedPredicate.pushedPredicate.getExprString());
+    if (decomposedPredicate.residualPredicate != null)
+      LOG.info("Predicates not Pushed: " + decomposedPredicate.residualPredicate.getExprString());
+
+    return decomposedPredicate;
   }
 }
