@@ -33,7 +33,7 @@ public class HiveBigQueryConstants {
           BigQueryConfiguration.GCS_BUCKET_KEY,
           BigQueryConfiguration.TEMP_GCS_PATH_KEY);
 
-  public static final ImmutableList<String> PPD_ALLOWED_TYPES =
+  public static final ImmutableList<String> PREDICATE_PUSHDOWN_ALLOWED_TYPES =
       ImmutableList.of(
           "int", "bigint", "float", "double", "string", "boolean", "timestamp", "date");
 }

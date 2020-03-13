@@ -77,7 +77,6 @@ public class WrappedBigQueryAvroInputFormat
       job.set(
           HiveBigQueryConstants.BIGQUERY_FILTER_EXPRESSION,
           job.get(TableScanDesc.FILTER_TEXT_CONF_STR, ""));
-      // job.setInt("mapred.map.tasks", numSplits);
 
       mapreduceSplits = mapreduceInputFormat.getSplits(Job.getInstance(job));
     } catch (InterruptedException ex) {

@@ -69,7 +69,7 @@ public class HiveBigQueryMetaHook implements HiveMetaHook {
     if(columnList != null && columnList.size() > 0) {
       //Set primitive Column names as PREDICATE_PUSHDOWN_COLUMNS
      String columnNames = columnList.stream()
-                                    .filter(column -> HiveBigQueryConstants.PPD_ALLOWED_TYPES.contains(column.getType()))
+                                    .filter(column -> HiveBigQueryConstants.PREDICATE_PUSHDOWN_ALLOWED_TYPES.contains(column.getType()))
                                     .map(column -> column.getName())
                                     .collect(Collectors.joining(HiveBigQueryConstants.DELIMITER));
 
