@@ -13,7 +13,6 @@
  */
 package com.google.cloud.hadoop.io.bigquery.hive;
 
-
 import com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat;
 import com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat.DirectBigQueryInputSplit;
 import com.google.cloud.hadoop.io.bigquery.hive.util.ReflectedTaskAttemptContextFactory;
@@ -27,6 +26,7 @@ import java.util.List;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat.HiveInputSplit;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
@@ -46,164 +46,175 @@ import org.slf4j.LoggerFactory;
 /*
  * Class {@link WrappedBigQueryAvroInputFormat} allows DirectBigQueryInputFormat to be used in mapred API.
  */
-public class WrappedBigQueryAvroInputFormat extends FileInputFormat<NullWritable, AvroGenericRecordWritable> {
-    private static final Logger LOG = LoggerFactory.getLogger(WrappedBigQueryAvroInputFormat.class);
-    private org.apache.hadoop.mapreduce.InputFormat<NullWritable, GenericRecord> mapreduceInputFormat =
-            new DirectBigQueryInputFormat();
+public class WrappedBigQueryAvroInputFormat
+    extends FileInputFormat<NullWritable, AvroGenericRecordWritable> {
+  private static final Logger LOG = LoggerFactory.getLogger(WrappedBigQueryAvroInputFormat.class);
+  private final org.apache.hadoop.mapreduce.InputFormat<NullWritable, GenericRecord>
+      mapreduceInputFormat = new DirectBigQueryInputFormat();
+
+  /**
+   * Creates hadoop splits (i.e BigQuery streams) so that each mapper can read data from the
+   * corresponding stream
+   *
+   * @param job Represents hadoop job
+   * @param numSplits Number of splits
+   * @return InputSplit[] - Collection of FileSplits representing BigQueryMapredInputSplit
+   * @throws IOException
+   */
+  @Override
+  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
+    // We don't really use any information in the job Context
+    List<org.apache.hadoop.mapreduce.InputSplit> mapreduceSplits;
+    try {
+      LOG.info(
+          "Column projection:{} and filter text:{} and BQ Filter text: {} ",
+          job.get(HiveBigQueryConstants.HIVE_PROJECTION_COLUMNS),
+          job.get(TableScanDesc.FILTER_TEXT_CONF_STR)
+      );
+      job.set(
+          HiveBigQueryConstants.BIGQUERY_PROJECTION_COLUMNS,
+          job.get(HiveBigQueryConstants.HIVE_PROJECTION_COLUMNS));
+      job.set(
+          HiveBigQueryConstants.BIGQUERY_FILTER_EXPRESSION,
+          job.get(TableScanDesc.FILTER_TEXT_CONF_STR, ""));
+
+      mapreduceSplits = mapreduceInputFormat.getSplits(Job.getInstance(job));
+    } catch (InterruptedException ex) {
+      throw new IOException("Interrupted", ex);
+    }
+
+    if (mapreduceSplits == null) {
+      return null;
+    }
+
+    // Wrap DirectBigQueryInputSplit inside this FileSplit
+    FileSplit[] splits = new FileSplit[mapreduceSplits.size()];
+    Path path = new Path(job.get("location"));
+    int ii = 0;
+    for (org.apache.hadoop.mapreduce.InputSplit mapreduceSplit : mapreduceSplits) {
+      LOG.info("Split[{}] = {}", ii, mapreduceSplit);
+      splits[ii++] = new BigQueryMapredInputSplit(mapreduceSplit, path);
+    }
+    return splits;
+  }
+
+  /**
+   * Creates RecordReader<K,V> where key is null and Value is AvroGenericRecord representing BQ Row
+   *
+   * @param inputSplit InputSplit (i.e BQ Stream object) containing slice of records
+   * @param conf Job Configuration
+   * @param reporter reporter instance
+   * @return instance of BigQueryMapredAvroRecordReader
+   * @throws IOException
+   */
+  @Override
+  public RecordReader<NullWritable, AvroGenericRecordWritable> getRecordReader(
+      InputSplit inputSplit, JobConf conf, Reporter reporter) throws IOException {
+    Preconditions.checkArgument(
+        inputSplit instanceof BigQueryMapredInputSplit,
+        "Split must be an instance of BigQueryMapredInputSplit");
+
+    try {
+      // The assertion is that this taskAttemptId isn't actually used, but in Hadoop2 calling
+      // toString() on an emptyJobID results in an NPE.
+      TaskAttemptID taskAttemptId = new TaskAttemptID();
+      TaskAttemptContext context =
+          ReflectedTaskAttemptContextFactory.getContext(conf, taskAttemptId);
+      org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit =
+          ((BigQueryMapredInputSplit) inputSplit).getMapreduceInputSplit();
+      LOG.info(
+          "mapreduceInputSplit is {}, class is {}",
+          mapreduceInputSplit,
+          mapreduceInputSplit.getClass().getName());
+      org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord> mapreduceRecordReader =
+          mapreduceInputFormat.createRecordReader(mapreduceInputSplit, context);
+      mapreduceRecordReader.initialize(mapreduceInputSplit, context);
+      long splitLength = inputSplit.getLength();
+
+      if (mapreduceInputSplit instanceof DirectBigQueryInputSplit) {
+        splitLength = ((DirectBigQueryInputSplit) mapreduceInputSplit).getLimit();
+      }
+
+      return new BigQueryMapredAvroRecordReader(mapreduceRecordReader, splitLength);
+    } catch (InterruptedException ex) {
+      throw new IOException("Interrupted", ex);
+    }
+  }
+
+  /**
+   * Mapreduce input split representing a Big Query Stream to be processed by each mapper.
+   * mapreduceInputSplit holds an instance of
+   * com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat$DirectBigQueryInputSplit
+   */
+  static class BigQueryMapredInputSplit extends HiveInputSplit {
+    private final org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit;
+    private final Writable writableInputSplit;
+    private Path path;
+
+    @VisibleForTesting
+    BigQueryMapredInputSplit() {
+      // Used by Hadoop serialization via reflection.
+      this(new DirectBigQueryInputSplit("dummy", "", 0), null);
+    }
 
     /**
-     * Creates hadoop splits (i.e BigQuery streams) so that each mapper can read data from the corresponding stream
-     * @param job  Represents hadoop job
-     * @param numSplits Number of splits
-     * @return InputSplit[] - Collection of FileSplits representing BigQueryMapredInputSplit
-     * @throws IOException
+     * @param mapreduceInputSplit An InputSplit that also implements Writable.
+     * @param path A HCFS path of that split. Hive assumes tables are file-based.
      */
+    BigQueryMapredInputSplit(
+        org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit, Path path) {
+      super();
+      this.mapreduceInputSplit = mapreduceInputSplit;
+      this.writableInputSplit = (Writable) mapreduceInputSplit;
+      this.path = path;
+    }
+
+    /** @param mapreduceInputSplit An InputSplit that also implements Writable. */
+    public BigQueryMapredInputSplit(org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit) {
+      Preconditions.checkArgument(
+          mapreduceInputSplit instanceof Writable, "inputSplit must also be Writable");
+      this.mapreduceInputSplit = mapreduceInputSplit;
+      this.writableInputSplit = (Writable) mapreduceInputSplit;
+    }
+
     @Override
-    public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-        // We don't really use any information in the job Context
-        List<org.apache.hadoop.mapreduce.InputSplit> mapreduceSplits;
-        try {
-            mapreduceSplits = mapreduceInputFormat.getSplits(Job.getInstance(job));
-        } catch (InterruptedException ex) {
-            throw new IOException("Interrupted", ex);
-        }
-
-        if (mapreduceSplits == null) {
-            return null;
-        }
-
-        //Wrap DirectBigQueryInputSplit inside this FileSplit
-        FileSplit[] splits = new FileSplit[mapreduceSplits.size()];
-        Path path = new Path(job.get("location"));
-        int ii = 0;
-        for (org.apache.hadoop.mapreduce.InputSplit mapreduceSplit :
-            mapreduceSplits) {
-            LOG.info("Split[{}] = {}", ii, mapreduceSplit);
-            splits[ii++] = new BigQueryMapredInputSplit(mapreduceSplit, path);
-        }
-        return splits;
+    public long getLength() {
+      return 1L;
     }
 
-    /**
-     *  Creates RecordReader<K,V> where key is null and Value is AvroGenericRecord representing BQ Row
-     *
-     * @param inputSplit InputSplit (i.e BQ Stream object) containg slice of records
-     * @param conf  Job Configuration
-     * @param reporter reporter instance
-     * @return instance of BigQueryMapredAvroRecordReader
-     * @throws IOException
-     */
     @Override
-    public RecordReader<NullWritable, AvroGenericRecordWritable> getRecordReader(
-        InputSplit inputSplit, JobConf conf, Reporter reporter) throws IOException {
-        Preconditions.checkArgument(inputSplit instanceof BigQueryMapredInputSplit,
-               "Split must be an instance of BigQueryMapredInputSplit");
-
-        try {
-            // The assertion is that this taskAttemptId isn't actually used, but in Hadoop2 calling
-            // toString() on an emptyJobID results in an NPE.
-            TaskAttemptID taskAttemptId = new TaskAttemptID();
-            TaskAttemptContext context =
-                    ReflectedTaskAttemptContextFactory.getContext(conf, taskAttemptId);
-            org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit =
-                    ((BigQueryMapredInputSplit) inputSplit).getMapreduceInputSplit();
-            LOG.info("mapreduceInputSplit is {}, class is {}",
-                    mapreduceInputSplit, mapreduceInputSplit.getClass().getName());
-            org.apache.hadoop.mapreduce.RecordReader<NullWritable, GenericRecord>  mapreduceRecordReader =
-                   mapreduceInputFormat.createRecordReader(mapreduceInputSplit, context);
-            mapreduceRecordReader.initialize(mapreduceInputSplit, context);
-            long splitLength = inputSplit.getLength();
-
-            if(mapreduceInputSplit instanceof DirectBigQueryInputSplit ){
-                splitLength = ((DirectBigQueryInputSplit)mapreduceInputSplit).getLimit();
-            }
-
-            return new BigQueryMapredAvroRecordReader(mapreduceRecordReader, splitLength);
-        } catch (InterruptedException ex) {
-            throw new IOException("Interrupted", ex);
-        }
+    public String[] getLocations() throws IOException {
+      try {
+        return mapreduceInputSplit.getLocations();
+      } catch (InterruptedException ex) {
+        throw new IOException("Interrupted", ex);
+      }
     }
 
-    /**
-     * Mapreduce input split representing a Big Query Stream to be processed by each mapper.
-     * mapreduceInputSplit holds an instance of com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat$DirectBigQueryInputSplit
-     */
-    static class BigQueryMapredInputSplit extends HiveInputSplit {
-        private org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit;
-        private Writable writableInputSplit;
-        private Path path;
-
-        @VisibleForTesting
-        BigQueryMapredInputSplit() {
-            // Used by Hadoop serialization via reflection.
-            this(new DirectBigQueryInputSplit("dummy","",0), null);
-        }
-
-        /**
-         * @param mapreduceInputSplit An InputSplit that also
-         *        implements Writable.
-         * @param path A HCFS path of that split. Hive assumes tables are file-based.
-         */
-        public BigQueryMapredInputSplit(
-            org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit, Path path) {
-            super();
-            this.mapreduceInputSplit = mapreduceInputSplit;
-            this.writableInputSplit = (Writable) mapreduceInputSplit;
-            this.path = path;
-        }
-
-        /**
-         * @param mapreduceInputSplit An InputSplit that also
-         *        implements Writable.
-         */
-        public BigQueryMapredInputSplit(
-            org.apache.hadoop.mapreduce.InputSplit mapreduceInputSplit) {
-            Preconditions.checkArgument(
-                mapreduceInputSplit instanceof Writable,
-                "inputSplit must also be Writable");
-            this.mapreduceInputSplit = mapreduceInputSplit;
-            writableInputSplit = (Writable) mapreduceInputSplit;
-        }
-
-        @Override
-        public long getLength() {
-            return 1L;
-        }
-
-        @Override
-        public String[] getLocations() throws IOException {
-            try {
-                return mapreduceInputSplit.getLocations();
-            } catch (InterruptedException ex) {
-                throw new IOException("Interrupted", ex);
-            }
-        }
-
-        @Override
-        public void readFields(DataInput in) throws IOException {
-            path = new Path(Text.readString(in));
-            writableInputSplit.readFields(in);
-        }
-
-        @Override
-        public void write(DataOutput out) throws IOException {
-            Text.writeString(out, path.toString());
-            writableInputSplit.write(out);
-        }
-
-        public org.apache.hadoop.mapreduce.InputSplit getMapreduceInputSplit() {
-            return mapreduceInputSplit;
-        }
-
-        @Override
-        public String toString() {
-            return mapreduceInputSplit.toString();
-        }
-
-        @Override
-        public Path getPath() {
-            return path;
-        }
+    @Override
+    public void readFields(DataInput in) throws IOException {
+      path = new Path(Text.readString(in));
+      writableInputSplit.readFields(in);
     }
 
+    @Override
+    public void write(DataOutput out) throws IOException {
+      Text.writeString(out, path.toString());
+      writableInputSplit.write(out);
+    }
+
+    public org.apache.hadoop.mapreduce.InputSplit getMapreduceInputSplit() {
+      return mapreduceInputSplit;
+    }
+
+    @Override
+    public String toString() {
+      return mapreduceInputSplit.toString();
+    }
+
+    @Override
+    public Path getPath() {
+      return path;
+    }
+  }
 }

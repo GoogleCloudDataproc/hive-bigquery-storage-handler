@@ -21,10 +21,19 @@ public class HiveBigQueryConstants {
   public static final String UNIQUE_JOB_KEY = "mapred.bq.unique.job.id";
   public static final String DEFAULT_BIGQUERY_DATASET_KEY = "bq.dataset";
   public static final String DEFAULT_BIGQUERY_TABLE_KEY = "bq.table";
+  public static final String PREDICATE_PUSHDOWN_COLUMNS = "ppd.columns";
+  public static final String HIVE_PROJECTION_COLUMNS = "hive.io.file.readcolumn.names";
+  public static final String BIGQUERY_PROJECTION_COLUMNS = "mapred.bq.input.selected.fields";
+  public static final String BIGQUERY_FILTER_EXPRESSION = "mapred.bq.input.sql.filter";
+  public static final String DELIMITER = ",";
 
   public static final ImmutableList<String> MANDATORY_TABLE_PROPERTIES =
       ImmutableList.of(
           BigQueryConfiguration.PROJECT_ID_KEY,
           BigQueryConfiguration.GCS_BUCKET_KEY,
           BigQueryConfiguration.TEMP_GCS_PATH_KEY);
+
+  public static final ImmutableList<String> PREDICATE_PUSHDOWN_ALLOWED_TYPES =
+      ImmutableList.of(
+          "int", "bigint", "float", "double", "string", "boolean", "timestamp", "date");
 }
