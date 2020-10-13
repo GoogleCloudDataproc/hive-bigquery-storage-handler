@@ -30,7 +30,7 @@
         <hive.version>2.3.4</hive.version>
         <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
         <bigdataoss-parent.version>2.0.0</bigdataoss-parent.version>
-        <junit.version>4.11</junit.version>
+        <junit.version>4.13.1</junit.version>
         <hamcrest.version>2.2</hamcrest.version>
         <guava.version>28.0-jre</guava.version>
         <flogger.version>0.4</flogger.version>
