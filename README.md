@@ -1,4 +1,4 @@
-# Hive-BigQuery StorageHandler  
+# Hive-BigQuery StorageHandler  [No Longer Maintained]
   
 This is a Hive StorageHandler plugin that enables Hive to interact with BigQuery. It allows you keep
 your existing pipelines but move to BigQuery. It utilizes the high throughput 
