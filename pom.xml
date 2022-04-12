@@ -26,7 +26,7 @@
     <name>hive-bigquery-storage-handler</name>
 
     <properties>
-        <hadoop.version>2.9.2</hadoop.version>
+        <hadoop.version>3.2.3</hadoop.version>
         <hive.version>2.3.4</hive.version>
         <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
         <bigdataoss-parent.version>2.0.0</bigdataoss-parent.version>
