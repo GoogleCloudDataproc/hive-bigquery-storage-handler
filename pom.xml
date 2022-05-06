@@ -26,28 +26,34 @@
     <name>hive-bigquery-storage-handler</name>
 
     <properties>
-        <hadoop.version>2.9.2</hadoop.version>
-        <hive.version>2.3.4</hive.version>
-        <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
         <bigdataoss-parent.version>2.0.0</bigdataoss-parent.version>
-        <junit.version>4.13.1</junit.version>
-        <hamcrest.version>2.2</hamcrest.version>
+        <bigquery-connector.version>hadoop2-1.0.0</bigquery-connector.version>
+        <hadoop.version>2.10.1</hadoop.version>
+        <hive.version>3.1.2</hive.version>
+        <protobuf.version>3.20.0</protobuf.version>
+        <legacy-bigquery-connector.version>hadoop2-1.0.0</legacy-bigquery-connector.version>
+        <bigquery-connector-common.version>0.24.2</bigquery-connector-common.version>
+        <google-cloud-bigquerystorage.version>2.11.0</google-cloud-bigquerystorage.version>
         <guava.version>28.0-jre</guava.version>
-        <flogger.version>0.4</flogger.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <maven-compiler-plugin.version>3.6.2</maven-compiler-plugin.version>
+        <junit.version>4.13.2</junit.version>
+        <hamcrest.version>2.2</hamcrest.version>
+
+        <maven-spotless-plugin.version>2.22.3</maven-spotless-plugin.version>
+        <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
         <maven-jar-plugin.version>3.1.0</maven-jar-plugin.version>
         <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
         <maven-exec-plugin.version>1.6.0</maven-exec-plugin.version>
+        <maven-shade-plugin.version>3.3.0</maven-shade-plugin.version>
+        <maven-surefire-plugin.version>3.0.0-M6</maven-surefire-plugin.version>
+
+        <java.version>1.8</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+
         <compiler.error.flag>-Werror</compiler.error.flag>
         <compiler.default.pkginfo.flag>-Xpkginfo:always</compiler.default.pkginfo.flag>
         <compiler.default.exclude>nothing</compiler.default.exclude>
-        <java.version>1.8</java.version>
-        <maven-shade-plugin.version>3.0.0</maven-shade-plugin.version>
-        <apache.avro.version>1.7.7</apache.avro.version>
-        <google.flogger.version>0.3.1</google.flogger.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     </properties>
 
