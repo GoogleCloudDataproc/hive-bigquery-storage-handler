@@ -6,10 +6,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.mapred.JobConf;
 import org.junit.*;
+import java.util.Properties;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
