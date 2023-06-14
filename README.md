@@ -1,4 +1,10 @@
-# Hive-BigQuery StorageHandler  [No Longer Maintained]
+# Hive-BigQuery StorageHandler
+
+# Deprecation notice
+
+### This repository is no longer maintained. Please refer to this other repository for the latest development on the Hive-BigQuery connector: https://github.com/GoogleCloudDataproc/hive-bigquery-connector
+
+## Introduction
   
 This is a Hive StorageHandler plugin that enables Hive to interact with BigQuery. It allows you keep
 your existing pipelines but move to BigQuery. It utilizes the high throughput 
